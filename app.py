@@ -209,16 +209,18 @@ def admin():
 
     return render_template('admin.html', responses=processed_rows, survey_data=SURVEY_DATA)
 
+
+
 # --- REPLACED REPORT ROUTE ---
 @app.route('/report')
 def report():
     if request.args.get('key') != 'mysecretadminpassword':
         return "Access Denied."
 
-    # 1. Fetch ALL Data
+    # 1. Fetch ALL Data (Required for Trend Analysis)
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT * FROM survey_responses ORDER BY submitted_at ASC")
+    cur.execute("SELECT * FROM survey_responses ORDER BY submitted_at ASC") # Ascending order is crucial for the Trend Chart
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -226,15 +228,15 @@ def report():
     if not rows:
         return "No data available to generate report."
 
-    # --- FILTER PARAMETERS (UPDATED) ---
+    # --- FILTER PARAMETERS ---
     selected_year = request.args.get('year')
     selected_month = request.args.get('month')
     
-    # 1. Extract unique YEARS from DB (Existing logic)
+    # 1. Extract unique YEARS from DB
     available_years = sorted(list(set([row['submitted_at'].strftime('%Y') for row in rows])), reverse=True)
 
-    # 2. Extract unique MONTHS from DB (New Logic)
-    # Get all unique month numbers (e.g., '01', '05', '12') present in the data
+    # 2. Extract unique MONTHS from DB (Dynamic)
+    # This logic ensures we only show months that exist in the database
     present_month_nums = sorted(list(set([row['submitted_at'].strftime('%m') for row in rows])))
     
     # Create the map only for these existing months (e.g., {'01': 'January', '05': 'May'})
@@ -277,7 +279,7 @@ def report():
     trend_data = []
     for m_key in sorted(trend_buckets.keys()):
         avg_score = sum(trend_buckets[m_key]) / len(trend_buckets[m_key])
-        # Convert '2026-01' -> 'Jan 2026'
+        # Convert '2026-01' -> 'Jan 2026' for display
         label = datetime.strptime(m_key, '%Y-%m').strftime('%b %Y')
         trend_labels.append(label)
         trend_data.append(round(avg_score, 2))
@@ -295,8 +297,15 @@ def report():
         
         filtered_rows.append(row)
 
+    # Handle case where filter returns no results
     if not filtered_rows:
-        return f"No data found for {selected_month or 'All Months'} / {selected_year or 'All Years'}."
+        # Fallback to empty data structure to prevent page crash
+        return render_template('report.html', 
+                               averages={}, total=0, overall=0, strongest=("N/A",0), weakest=("N/A",0),
+                               timestamp=get_ist_time().strftime('%Y-%m-%d %I:%M %p'),
+                               available_years=available_years, month_map=month_map,
+                               selected_year=selected_year, selected_month=selected_month,
+                               trend_labels=trend_labels, trend_data=trend_data)
 
     # Standard Calculation on Filtered Subset
     category_scores = {category: [] for category in SURVEY_DATA.keys()}
@@ -307,6 +316,7 @@ def report():
             if not isinstance(value, int): continue
             if '_' in key:
                 raw_cat = key.rsplit('_', 1)[0]
+                # Fix: Normalize 'and' to '&'
                 if raw_cat in category_scores:
                     category_scores[raw_cat].append(value)
                 elif raw_cat.replace(' and ', ' & ') in category_scores:
@@ -354,6 +364,8 @@ def report():
                            # Trend Data
                            trend_labels=trend_labels,
                            trend_data=trend_data)
+
+
 
 # --- NEW ROUTE: AGGREGATE ORGANIZATION ANALYSIS ---
 @app.route('/analyze_aggregate')

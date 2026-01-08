@@ -13,11 +13,12 @@
         .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
 
         /* --- Filter Bar --- */
-        .filter-bar { background: #eee; padding: 15px; border-radius: 8px; display: flex; justify-content: center; gap: 15px; align-items: center; margin-bottom: 30px; }
-        .filter-select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; color: #333; }
-        .btn-filter { background: #FF6600; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .filter-bar { background: #fff5f0; border: 1px solid #ffccaa; padding: 15px; border-radius: 8px; display: flex; justify-content: center; gap: 15px; align-items: center; margin-bottom: 30px; }
+        .filter-select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; color: #333; background: white; cursor: pointer; }
+        .btn-filter { background: #FF6600; color: white; border: none; padding: 9px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
         .btn-filter:hover { background: #e65c00; }
-        .btn-clear { color: #666; text-decoration: underline; cursor: pointer; font-size: 0.9em; }
+        .btn-clear { color: #666; text-decoration: underline; cursor: pointer; font-size: 0.9em; margin-left: 10px; }
+        .btn-clear:hover { color: #333; }
 
         /* KPI Cards */
         .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 40px; }
@@ -26,14 +27,17 @@
         .kpi-label { font-size: 0.9em; color: #555; text-transform: uppercase; letter-spacing: 1px; }
 
         /* Trend Section */
-        .trend-section { margin-bottom: 40px; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
+        .trend-section { margin-bottom: 40px; padding: 25px; border: 1px solid #eee; border-radius: 8px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
 
         /* AI Section */
         .ai-section { margin-bottom: 40px; background: #f0f7ff; border: 1px solid #cce5ff; border-radius: 8px; padding: 30px; }
         .ai-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #dae9fa; padding-bottom: 15px; }
-        .btn-ai { background: linear-gradient(135deg, #FF6600 0%, #E65C00 100%); color: white; border: none; padding: 10px 25px; border-radius: 25px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 10px; font-size: 1em; }
+        .btn-ai { background: linear-gradient(135deg, #FF6600 0%, #E65C00 100%); color: white; border: none; padding: 10px 25px; border-radius: 25px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 10px; font-size: 1em; transition: opacity 0.2s; }
+        .btn-ai:hover { opacity: 0.9; }
         
+        .ai-content { font-size: 1em; line-height: 1.6; color: #444; }
         .ai-content h3 { margin-top: 25px; font-size: 1.2em; color: #FF6600; border-left: 5px solid #FF6600; padding-left: 10px; }
+        .ai-content ul { padding-left: 20px; }
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid #FF6600; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -43,6 +47,12 @@
         .bar-box { flex: 1; }
 
         .footer { text-align: center; margin-top: 50px; font-size: 0.8em; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+        
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; }
+            .btn-ai, .filter-bar { display: none; }
+        }
     </style>
 </head>
 <body>
@@ -56,7 +66,11 @@
         <form class="filter-bar" method="get">
             <input type="hidden" name="key" value="mysecretadminpassword">
             
-            <label><strong>Filter Snapshot:</strong></label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="ph ph-funnel" style="font-size: 1.2em; color: #FF6600;"></i>
+                <label><strong>Filter Snapshot:</strong></label>
+            </div>
+
             <select name="year" class="filter-select">
                 <option value="">All Years</option>
                 {% for year in available_years %}
@@ -95,8 +109,8 @@
         </div>
 
         <div class="trend-section">
-            <h3 style="color: #444; margin-top: 0;">Engagement Trend (Year-over-Year)</h3>
-            <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">Historical progression of the overall organization score.</p>
+            <h3 style="color: #444; margin-top: 0; text-align: center;">Engagement Trend (Historical)</h3>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 15px; text-align: center;">Progression of the overall organization score over time.</p>
             <div style="height: 300px;">
                 <canvas id="trendChart"></canvas>
             </div>
@@ -115,7 +129,7 @@
                     <i class="ph ph-sparkle"></i> Generate Insight
                 </button>
             </div>
-            <div id="loader" style="display: none; justify-content: center; padding: 20px; gap: 10px;">
+            <div id="loader" style="display: none; justify-content: center; padding: 20px; gap: 10px; align-items: center; color: #666;">
                 <div class="loader" style="display: block;"></div> Analyzing...
             </div>
             <div id="ai-result" class="ai-content"></div>
@@ -151,6 +165,7 @@
                 pointBackgroundColor: 'white',
                 pointBorderColor: '#FF6600',
                 pointRadius: 5,
+                pointHoverRadius: 7,
                 fill: true,
                 tension: 0.3
             }]
@@ -179,10 +194,13 @@
                 data: scores,
                 backgroundColor: 'rgba(0, 51, 102, 0.2)',
                 borderColor: 'rgba(0, 51, 102, 1)',
-                borderWidth: 2
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(0, 51, 102, 1)'
             }]
         },
-        options: { scales: { r: { min: 0, max: 5 } } }
+        options: {
+            scales: { r: { min: 0, max: 5, ticks: { stepSize: 1 } } }
+        }
     });
 
     // --- 3. BAR CHART ---
@@ -216,7 +234,7 @@
             if (data.analysis) resultBox.innerHTML = data.analysis;
             else resultBox.innerHTML = `<span style="color:red">Error: ${data.error}</span>`;
         } catch (error) {
-            resultBox.innerHTML = `<span style="color:red">Connection Error</span>`;
+            resultBox.innerHTML = `<span style="color:red">Connection Error. Please try again.</span>`;
         } finally {
             loader.style.display = 'none';
         }
