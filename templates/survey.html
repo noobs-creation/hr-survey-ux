@@ -37,6 +37,7 @@
         /* Success Message */
         .success-box { background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; padding: 20px; text-align: center; margin-bottom: 20px; font-size: 1.2em; }
     </style>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body>
 
@@ -122,32 +123,46 @@
 
             {% for category, questions in survey_data.items() %}
                 <div class="category-header">{{ category }}</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="question-col">Question</th>
-                            <th>Strongly<br>Disagree (1)</th>
-                            <th>Disagree (2)</th>
-                            <th>Neutral (3)</th>
-                            <th>Agree (4)</th>
-                            <th>Strongly<br>Agree (5)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for question_text in questions %}
-                        {% set q_index = loop.index %}
-                        <tr>
-                            <td>{{ question_text }}</td>
-                            
-                            {% for i in range(1, 6) %}
-                            <td class="radio-cell">
-                                <input type="radio" name="{{ category }}_{{ q_index }}" value="{{ i }}" required>
-                            </td>
+                
+                {% if category == 'Comments' %}
+                    {% for question_text in questions %}
+                    {% set q_index = loop.index %}
+                    <div style="margin-top: 15px;">
+                        <p style="margin-bottom: 10px; font-weight: bold; color: #555;">{{ question_text }}</p>
+                        <textarea name="{{ category }}_{{ q_index }}" rows="4" 
+                                  style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: inherit;" 
+                                  placeholder="Type your answer here..."></textarea>
+                    </div>
+                    {% endfor %}
+                
+                {% else %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="question-col">Question</th>
+                                <th>Strongly<br>Disagree (1)</th>
+                                <th>Disagree (2)</th>
+                                <th>Neutral (3)</th>
+                                <th>Agree (4)</th>
+                                <th>Strongly<br>Agree (5)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for question_text in questions %}
+                            {% set q_index = loop.index %}
+                            <tr>
+                                <td>{{ question_text }}</td>
+                                
+                                {% for i in range(1, 6) %}
+                                <td class="radio-cell">
+                                    <input type="radio" name="{{ category }}_{{ q_index }}" value="{{ i }}" required>
+                                </td>
+                                {% endfor %}
+                            </tr>
                             {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                {% endif %}
             {% endfor %}
 
             <div class="btn-container">
@@ -156,6 +171,16 @@
         </form>
     {% endif %}
 </div>
+<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #777; font-size: 0.85em;">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 5px;">
+                <i class="ph ph-shield-check" style="font-size: 1.3em; color: #28a745;"></i>
+                <strong style="color: #333;">Cryptographically Anonymous</strong>
+            </div>
+            <p style="max-width: 600px; margin: 0 auto; line-height: 1.4;">
+                Your identity is protected. Survey responses are decoupled from user identifiers using a one-way hash algorithm before storage. 
+                Management cannot trace individual answers back to you.
+            </p>
+        </div>
 
 </body>
 </html>

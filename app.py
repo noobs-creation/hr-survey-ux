@@ -348,6 +348,48 @@ def report():
     
     ist_now = get_ist_time()
 
+    # --- ENGINE 3: WORD CLOUD PROCESSING ---
+    # 1. Collect all text comments from FILTERED rows
+    text_corpus = ""
+    for row in filtered_rows:
+        answers = row['answers']
+        for key, val in answers.items():
+            # Check for keys starting with "Comments" AND ensure value is a string
+            if key.startswith('Comments') and isinstance(val, str):
+                text_corpus += " " + val.lower()
+
+    # 2. Simple Stop-Word Removal (Manual list to avoid heavy NLTK dependency)
+    stop_words = set([
+        'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 
+        'he', 'him', 'his', 'she', 'her', 'hers', 'it', 'its', 'they', 'them', 'their', 
+        'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 
+        'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 
+        'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 
+        'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into', 
+        'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 
+        'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 
+        'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 
+        'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 
+        'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now', 
+        'bstl', 'company', 'organization' # Context specific stop words
+    ])
+    
+    # 3. Frequency Count
+    import re
+    words = re.findall(r'\b[a-z]{3,}\b', text_corpus) # Only words 3+ chars
+    word_counts = {}
+    for word in words:
+        if word not in stop_words:
+            word_counts[word] = word_counts.get(word, 0) + 1
+            
+    # Format for WordCloud2.js: [['word', count], ['word2', count]]
+    # Get Top 50 words
+    sorted_words = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:50]
+    word_cloud_data = [[word, count] for word, count in sorted_words]
+
+    # ... (Keep existing return statement but ADD word_cloud_data) ...
+
+
     return render_template('report.html', 
                            # Snapshot Data
                            averages=final_averages, 
@@ -363,7 +405,8 @@ def report():
                            selected_month=selected_month,
                            # Trend Data
                            trend_labels=trend_labels,
-                           trend_data=trend_data)
+                           trend_data=trend_data,
+                           word_cloud_data=word_cloud_data)
 
 
 

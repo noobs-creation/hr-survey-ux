@@ -1,69 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
     <meta charset="UTF-8">
     <title>HR Executive Summary</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <style>
         body { font-family: 'Segoe UI', sans-serif; padding: 40px; background: #f9f9f9; color: #333; }
-        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        
+        /* The container ID is important for PDF generation */
+        #report-container { max-width: 1000px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        /* Word Cloud Section */
+        .wordcloud-section { margin-bottom: 40px; padding: 25px; border: 1px solid #eee; border-radius: 8px; background: #fff; page-break-inside: avoid; }
+        #word_cloud_canvas { width: 100%; height: 350px; cursor: pointer; }
         
         h1 { color: #FF6600; text-align: center; margin-bottom: 5px; }
         .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
 
-        /* --- Filter Bar --- */
+        /* Filter Bar */
         .filter-bar { background: #fff5f0; border: 1px solid #ffccaa; padding: 15px; border-radius: 8px; display: flex; justify-content: center; gap: 15px; align-items: center; margin-bottom: 30px; }
         .filter-select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; color: #333; background: white; cursor: pointer; }
         .btn-filter { background: #FF6600; color: white; border: none; padding: 9px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
         .btn-filter:hover { background: #e65c00; }
         .btn-clear { color: #666; text-decoration: underline; cursor: pointer; font-size: 0.9em; margin-left: 10px; }
-        .btn-clear:hover { color: #333; }
+
+        /* Control Bar (Download Button) */
+        .control-bar { display: flex; justify-content: flex-end; margin-bottom: 20px; max-width: 1000px; margin: 0 auto 20px auto; }
+        .btn-download { background: #333; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: bold; transition: transform 0.2s; }
+        .btn-download:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
 
         /* KPI Cards */
         .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 40px; }
-        .kpi-card { background: #f4f6f8; padding: 20px; text-align: center; border-radius: 8px; border: 1px solid #ddd; }
+        .kpi-card { background: #f4f6f8; padding: 20px; text-align: center; border-radius: 8px; border: 1px solid #ddd; page-break-inside: avoid; }
         .kpi-val { font-size: 2em; font-weight: bold; color: #FF6600; display: block; margin-bottom: 5px; }
         .kpi-label { font-size: 0.9em; color: #555; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* Trend Section */
-        .trend-section { margin-bottom: 40px; padding: 25px; border: 1px solid #eee; border-radius: 8px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-
-        /* AI Section */
-        .ai-section { margin-bottom: 40px; background: #f0f7ff; border: 1px solid #cce5ff; border-radius: 8px; padding: 30px; }
+        /* Sections */
+        .trend-section { margin-bottom: 40px; padding: 25px; border: 1px solid #eee; border-radius: 8px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.03); page-break-inside: avoid; }
+        
+        .ai-section { margin-bottom: 40px; background: #f0f7ff; border: 1px solid #cce5ff; border-radius: 8px; padding: 30px; page-break-inside: avoid; }
         .ai-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #dae9fa; padding-bottom: 15px; }
-        .btn-ai { background: linear-gradient(135deg, #FF6600 0%, #E65C00 100%); color: white; border: none; padding: 10px 25px; border-radius: 25px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 10px; font-size: 1em; transition: opacity 0.2s; }
-        .btn-ai:hover { opacity: 0.9; }
+        .btn-ai { background: linear-gradient(135deg, #FF6600 0%, #E65C00 100%); color: white; border: none; padding: 10px 25px; border-radius: 25px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 10px; font-size: 1em; }
         
         .ai-content { font-size: 1em; line-height: 1.6; color: #444; }
         .ai-content h3 { margin-top: 25px; font-size: 1.2em; color: #FF6600; border-left: 5px solid #FF6600; padding-left: 10px; }
-        .ai-content ul { padding-left: 20px; }
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid #FF6600; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* Chart Layout */
-        .chart-section { display: flex; gap: 40px; margin-bottom: 40px; align-items: center; }
+        .chart-section { display: flex; gap: 40px; margin-bottom: 40px; align-items: center; page-break-inside: avoid; }
         .radar-box { flex: 1; }
         .bar-box { flex: 1; }
 
         .footer { text-align: center; margin-top: 50px; font-size: 0.8em; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
         
-        @media print {
-            body { background: white; padding: 0; }
-            .container { box-shadow: none; }
-            .btn-ai, .filter-bar { display: none; }
-        }
+        /* HIDE ON PDF: These elements will vanish in the downloaded file */
+        .hide-on-pdf { } 
     </style>
 </head>
 <body>
 
-    {% include 'header.html' %}  
-    
-    <div class="container">
+    <div class="control-bar hide-on-pdf">
+        <button class="btn-download" onclick="downloadPDF()">
+            <i class="ph ph-download-simple" style="font-size: 1.2em;"></i> Download PDF Report
+        </button>
+    </div>
+
+    <div id="report-container" class="container">
+        
+        {% include 'header.html' %}  
+        
         <h1>Organization Culture Report</h1>
         <div class="subtitle">Generated on {{ timestamp }}</div>
 
-        <form class="filter-bar" method="get">
+        <form class="filter-bar hide-on-pdf" method="get">
             <input type="hidden" name="key" value="mysecretadminpassword">
             
             <div style="display: flex; align-items: center; gap: 10px;">
@@ -108,6 +121,19 @@
             </div>
         </div>
 
+        <div class="wordcloud-section">
+            <h3 style="color: #444; margin-top: 0; text-align: center;">Employee Sentiment (Key Themes)</h3>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 15px; text-align: center;">Most frequently mentioned words in open feedback.</p>
+
+            <div id="word_cloud_canvas"></div>
+
+            {% if not word_cloud_data %}
+            <div style="text-align: center; color: #999; padding: 40px;">
+                No text comments available for this period.
+            </div>
+            {% endif %}
+        </div>
+
         <div class="trend-section">
             <h3 style="color: #444; margin-top: 0; text-align: center;">Engagement Trend (Historical)</h3>
             <p style="font-size: 0.9em; color: #666; margin-bottom: 15px; text-align: center;">Progression of the overall organization score over time.</p>
@@ -125,7 +151,7 @@
                         <div style="font-size: 0.85em; color: #666;">Deep analysis of filtered data</div>
                     </div>
                 </div>
-                <button class="btn-ai" onclick="generateReport()">
+                <button class="btn-ai hide-on-pdf" onclick="generateReport()">
                     <i class="ph ph-sparkle"></i> Generate Insight
                 </button>
             </div>
@@ -150,7 +176,54 @@
     </div>
 
 <script>
-    // --- 1. TREND CHART (Line) ---
+    // --- 5. WORD CLOUD ---
+const wordList = {{ word_cloud_data | tojson }};
+
+if (wordList.length > 0) {
+    // Calculate a weight factor to scale word sizes appropriately
+    // If max count is 2, factor is big (30). If max count is 100, factor is small (1).
+    const maxCount = wordList[0][1];
+    const weightFactor = 40 / Math.max(maxCount, 1); 
+
+    WordCloud(document.getElementById('word_cloud_canvas'), {
+        list: wordList,
+        gridSize: 8,
+        weightFactor: function (size) { return size * weightFactor + 10; }, // Custom scaling
+        fontFamily: 'Segoe UI, sans-serif',
+        color: function (word, weight) {
+            // Randomly choose between Orange, Dark Blue, and Grey
+            const colors = ['#FF6600', '#003366', '#666666', '#e65c00'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        },
+        rotateRatio: 0, // 0 = all horizontal (easier to read)
+        backgroundColor: '#fff'
+    });
+}
+    // --- PDF GENERATION LOGIC ---
+    function downloadPDF() {
+        const element = document.getElementById('report-container');
+        const opt = {
+            margin:       0.5,
+            filename:     'HR_Executive_Report.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 }, // Higher scale = better chart quality
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+            // Ignore the filter bar and buttons in the PDF
+            pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        // Temporarily hide elements using CSS class before printing
+        document.querySelectorAll('.hide-on-pdf').forEach(el => el.style.display = 'none');
+
+        html2pdf().set(opt).from(element).save().then(() => {
+            // Restore elements after download
+            document.querySelectorAll('.hide-on-pdf').forEach(el => el.style.display = 'flex'); // or block/flex depending
+            // A safer restore for mix of display types:
+            location.reload(); 
+        });
+    }
+
+    // --- CHART CONFIGURATION (No Changes Required Here) ---
     const ctxTrend = document.getElementById('trendChart').getContext('2d');
     new Chart(ctxTrend, {
         type: 'line',
@@ -165,7 +238,6 @@
                 pointBackgroundColor: 'white',
                 pointBorderColor: '#FF6600',
                 pointRadius: 5,
-                pointHoverRadius: 7,
                 fill: true,
                 tension: 0.3
             }]
@@ -177,11 +249,11 @@
                 y: { min: 0, max: 5, grid: { color: '#f0f0f0' } },
                 x: { grid: { display: false } }
             },
-            plugins: { legend: { display: false } }
+            plugins: { legend: { display: false } },
+            animation: false // Turn off animation for better PDF rendering
         }
     });
 
-    // --- 2. RADAR CHART ---
     const categories = {{ averages.keys()|list|tojson }};
     const scores = {{ averages.values()|list|tojson }};
     
@@ -194,16 +266,15 @@
                 data: scores,
                 backgroundColor: 'rgba(0, 51, 102, 0.2)',
                 borderColor: 'rgba(0, 51, 102, 1)',
-                borderWidth: 2,
-                pointBackgroundColor: 'rgba(0, 51, 102, 1)'
+                borderWidth: 2
             }]
         },
-        options: {
-            scales: { r: { min: 0, max: 5, ticks: { stepSize: 1 } } }
+        options: { 
+            scales: { r: { min: 0, max: 5 } },
+            animation: false
         }
     });
 
-    // --- 3. BAR CHART ---
     new Chart(document.getElementById('barChart').getContext('2d'), {
         type: 'bar',
         data: {
@@ -217,11 +288,11 @@
         options: {
             indexAxis: 'y',
             scales: { x: { min: 0, max: 5 } },
-            plugins: { legend: { display: false } }
+            plugins: { legend: { display: false } },
+            animation: false
         }
     });
 
-    // --- 4. AI REPORT ---
     async function generateReport() {
         const resultBox = document.getElementById('ai-result');
         const loader = document.getElementById('loader');
@@ -234,7 +305,7 @@
             if (data.analysis) resultBox.innerHTML = data.analysis;
             else resultBox.innerHTML = `<span style="color:red">Error: ${data.error}</span>`;
         } catch (error) {
-            resultBox.innerHTML = `<span style="color:red">Connection Error. Please try again.</span>`;
+            resultBox.innerHTML = `<span style="color:red">Connection Error</span>`;
         } finally {
             loader.style.display = 'none';
         }
