@@ -11,10 +11,14 @@ This Flask application handles:
 import os
 import json
 import psycopg2
-from flask import Flask, render_template, request, jsonify
+import random
+import string
+from flask import Flask, render_template, request, jsonify, send_file, redirect
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import pytz
+import io
+import csv
 
 # --- 1. ROBUST DOTENV IMPORT ---
 try:
@@ -246,9 +250,77 @@ def admin():
                          end_date=end_date,
                          unused_tokens=unused_tokens) # Passing tokens to template
 
-# ... [Keep report routes exactly as they were, they don't need token logic] ...
+@app.route('/generate_tokens')
+def generate_tokens():
+    if request.args.get('key') != 'mysecretadminpassword':
+        return "Access Denied."
 
-# --- REPLACED REPORT ROUTE ---
+    conn = get_db_connection()
+    if not conn:
+        return "Database Connection Error"
+
+    try:
+        cur = conn.cursor()
+        
+        count_added = 0
+        target_count = 50
+        
+        # Loop until we have successfully added 50 new unique tokens
+        while count_added < target_count:
+            # Generate 4 Letters + 4 Numbers (ABCD1234)
+            letters = ''.join(random.choices(string.ascii_uppercase, k=4))
+            numbers = ''.join(random.choices(string.digits, k=4))
+            token = letters + numbers
+            
+            # Insert safely: ON CONFLICT DO NOTHING ensures duplicates (if any) are ignored
+            cur.execute("""
+                INSERT INTO survey_tokens (token_code) 
+                VALUES (%s) 
+                ON CONFLICT (token_code) DO NOTHING
+            """, (token,))
+            
+            # rowcount > 0 means a new row was actually inserted
+            if cur.rowcount > 0:
+                count_added += 1
+                
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        # Reload the admin page to show the new tokens
+        return redirect('/admin?key=mysecretadminpassword')
+        
+    except Exception as e:
+        if conn: conn.rollback()
+        return f"Error generating tokens: {e}"
+
+@app.route('/download_tokens')
+def download_tokens():
+    if request.args.get('key') != 'mysecretadminpassword':
+        return "Access Denied."
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT token_code FROM survey_tokens WHERE is_used = FALSE")
+    tokens = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    # Create CSV in memory
+    si = io.StringIO()
+    cw = csv.writer(si)
+    cw.writerow(['Access Token', 'Survey Link']) # Header
+    
+    base_url = request.host_url
+    for t in tokens:
+        cw.writerow([t[0], f"{base_url}?token={t[0]}"])
+
+    output = io.BytesIO()
+    output.write(si.getvalue().encode('utf-8'))
+    output.seek(0)
+
+    return send_file(output, mimetype='text/csv', as_attachment=True, download_name='unused_tokens.csv')
+
 @app.route('/report')
 def report():
     if request.args.get('key') != 'mysecretadminpassword':

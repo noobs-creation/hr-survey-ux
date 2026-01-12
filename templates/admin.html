@@ -105,6 +105,7 @@
                 <span>Unused Tokens ({{ unused_tokens|length }})</span>
                 <i class="ph ph-key" style="color: var(--primary);"></i>
             </h4>
+            
             <div class="token-list">
                 {% for token in unused_tokens %}
                 <div class="token-item">
@@ -119,6 +120,10 @@
             <a href="/download_tokens?key=mysecretadminpassword" style="display:block; text-align:center; margin-top:10px; color:#FF6600; font-weight:bold; text-decoration:none; font-size: 0.9em;">
                 <i class="ph ph-file-csv"></i> Download CSV
             </a>
+            <a href="/generate_tokens?key=mysecretadminpassword" style="display:block; text-align:center; margin-top:10px; color:#28a745; font-weight:bold; text-decoration:none; font-size: 0.9em;">
+                <i class="ph ph-plus-circle"></i> Generate 50 New Tokens
+            </a>
+            
         </div>
     </div>
     <div><br></div>
