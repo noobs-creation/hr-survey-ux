@@ -1,4 +1,3 @@
-
 """
 HR Survey Application - Main Application Entry Point
 --------------------------------------------------
@@ -7,6 +6,7 @@ This Flask application handles:
 2. Collecting and persisting responses to a PostgreSQL database.
 3. Generating Admin Dashboards with statistical analysis.
 4. Integrating Google Gemini AI for qualitative psychological profiling.
+5. Managing Token-based Authentication.
 """
 import os
 import json
@@ -17,10 +17,6 @@ from datetime import datetime
 import pytz
 
 # --- 1. ROBUST DOTENV IMPORT ---
-# --- Configuration & Environment Setup ---
-# Robust configuration pattern: 
-# 1. Attempts to load local .env file for development.
-# 2. Falls back to system environment variables for production (Render/AWS).
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -42,8 +38,6 @@ with open('final_hr_questions.json', 'r') as f:
 
 
 def get_db_connection():
-    # Establishes a connection to the PostgreSQL database.
-    # Relies on the 'DATABASE_URL' environment variable for security.
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
         pass 
@@ -52,8 +46,6 @@ def get_db_connection():
 
 def get_ist_time():
     """Returns current time in Indian Standard Time"""
-    # UTC is the standard for storage, but IST is required for
-    # admin display purposes in the specific region context.
     utc_now = datetime.now(pytz.utc)
     ist_tz = pytz.timezone('Asia/Kolkata')
     return utc_now.astimezone(ist_tz)
@@ -65,11 +57,15 @@ def index():
 @app.route('/submit', methods=['POST'])
 def submit():
     form_data = request.form.to_dict()
-    # --- Data Sanitization ---
-    # Convert numeric string inputs (e.g., "5") to integers for calculation.
-    # Preserve text inputs (e.g., comments) as strings.
-    respondent_name = form_data.pop('respondent_name', 'Anonymous') or 'Anonymous'
     
+    # 1. Extract Token
+    token_input = form_data.pop('token', '').strip().upper()
+    
+    if not token_input:
+        return render_template('survey.html', survey_data=SURVEY_DATA, error="Access Token is required.")
+
+    # 2. Extract Data
+    respondent_name = form_data.pop('respondent_name', 'Anonymous') or 'Anonymous'
     processed_answers = {}
     for key, value in form_data.items():
         try:
@@ -82,15 +78,40 @@ def submit():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+
+        # --- TOKEN VALIDATION & BURNING ---
+        # Check if token exists and is unused
+        cur.execute("SELECT id, is_used FROM survey_tokens WHERE token_code = %s FOR UPDATE", (token_input,))
+        token_row = cur.fetchone()
+
+        if not token_row:
+            cur.close()
+            conn.close()
+            return render_template('survey.html', survey_data=SURVEY_DATA, error="Invalid Access Token.")
+        
+        token_id, is_used = token_row
+        
+        if is_used:
+            cur.close()
+            conn.close()
+            return render_template('survey.html', survey_data=SURVEY_DATA, error="This token has already been used.")
+
+        # Mark token as used
+        cur.execute("UPDATE survey_tokens SET is_used = TRUE, used_at = %s WHERE id = %s", (ist_now, token_id))
+        
+        # --- SAVE SURVEY RESPONSE ---
         cur.execute(
             "INSERT INTO survey_responses (respondent_name, answers, submitted_at) VALUES (%s, %s, %s)",
             (respondent_name, json.dumps(processed_answers), ist_now)
         )
+        
         conn.commit()
         cur.close()
         conn.close()
         return render_template('survey.html', survey_data=SURVEY_DATA, success=True)
+        
     except Exception as e:
+        if conn: conn.rollback()
         return f"Database Error: {e}"
 
 
@@ -99,50 +120,62 @@ def admin():
     if request.args.get('key') != 'mysecretadminpassword':
         return "Access Denied."
 
+    # --- 1. Date Filter Logic ---
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    query = "SELECT * FROM survey_responses"
+    params = []
+    
+    if start_date and end_date:
+        query += " WHERE submitted_at BETWEEN %s AND %s"
+        params = [start_date, end_date + ' 23:59:59']
+    
+    query += " ORDER BY submitted_at DESC"
+
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT * FROM survey_responses ORDER BY submitted_at DESC")
+    
+    # Fetch Responses
+    cur.execute(query, tuple(params))
     rows = cur.fetchall()
+
+    # --- FETCH UNUSED TOKENS ---
+    cur.execute("SELECT token_code FROM survey_tokens WHERE is_used = FALSE ORDER BY id ASC")
+    token_rows = cur.fetchall()
+    unused_tokens = [t['token_code'] for t in token_rows]
+
     cur.close()
     conn.close()
 
     ist_tz = pytz.timezone('Asia/Kolkata')
     processed_rows = []
     
+    # --- Trend Data Storage ---
+    monthly_scores = {} 
+    
     for row in rows:
-        # 1. Convert Time to IST
         utc_time = row['submitted_at']
         if utc_time:
             if utc_time.tzinfo is None:
                 utc_time = pytz.utc.localize(utc_time)
             row['submitted_at'] = utc_time.astimezone(ist_tz)
 
-        # 2. Parse Answers
         answers = row['answers']
         cat_totals = {k: [] for k in SURVEY_DATA.keys()}
         
         for key, val in answers.items():
             if isinstance(val, int) and '_' in key:
-                raw_cat = key.rsplit('_', 1)[0]
-                # --- Data Integrity Normalization ---
-                # Resolves naming discrepancies between the Database (stores "and") 
-                # and the JSON configuration (uses "&").
-                # This ensures scores are correctly mapped to their categories.
-                # --- Fix: Normalize 'and' to '&' ---
+                parts = key.rsplit('_', 1)
+                raw_cat = parts[0]
                 if raw_cat in cat_totals:
                     category = raw_cat
                 elif raw_cat.replace(' and ', ' & ') in cat_totals:
                     category = raw_cat.replace(' and ', ' & ')
                 else:
                     continue
-
                 cat_totals[category].append(val)
-        # --- Statistical Calculation Engine ---
-        # Calculates "Equal Weight" averages.
-        # 1. Calculate average for each Category first.
-        # 2. Average the Category scores to get the Overall Score.
-        # This prevents categories with more questions from skewing the final result.
-        # 3. Calculate Normalized Stats
+        
         cat_averages = {}
         sum_of_category_averages = 0
         valid_categories_count = 0
@@ -156,45 +189,33 @@ def admin():
             else:
                 cat_averages[cat] = 0
         
-        # 4. Calculate Overall Score
         if valid_categories_count > 0:
             overall = round(sum_of_category_averages / valid_categories_count, 2)
         else:
             overall = 0
-        # --- Insight Logic & Tie-Breaker ---
-        # Identifies Top Strength and Weakness.
-        # Includes logic to handle "Flat Profiles" (e.g., User rated everything 5/5),
-        # preventing arbitrary alphabetical sorting in tie scenarios.
-        # 5. Determine Strength/Weakness (WITH TIE-BREAKER LOGIC)
-        active_cats = {k:v for k,v in cat_averages.items() if v > 0}
         
+        month_key = row['submitted_at'].strftime('%Y-%m')
+        if month_key not in monthly_scores:
+            monthly_scores[month_key] = []
+        monthly_scores[month_key].append(overall)
+
+        active_cats = {k:v for k,v in cat_averages.items() if v > 0}
         if active_cats:
-            # Sort by score descending
             sorted_cats = sorted(active_cats.items(), key=lambda x: x[1], reverse=True)
-            
             highest_score = sorted_cats[0][1]
             lowest_score = sorted_cats[-1][1]
             
-            # --- THIS IS THE MISSING PART IN YOUR CODE ---
-            # Check for Flat Profile (Variance is 0)
             if highest_score == lowest_score:
                 if highest_score == 5:
-                    strength = ("All Categories", 5.0)
-                    weakness = ("None", 0)
+                    strength, weakness = ("All Categories", 5.0), ("None", 0)
                 elif highest_score == 1:
-                    strength = ("None", 0)
-                    weakness = ("All Categories", 1.0)
+                    strength, weakness = ("None", 0), ("All Categories", 1.0)
                 else:
-                    strength = ("Balanced Profile", highest_score)
-                    weakness = ("Balanced Profile", lowest_score)
+                    strength, weakness = ("Balanced", highest_score), ("Balanced", lowest_score)
             else:
-                # Standard case: Variance exists
-                strength = sorted_cats[0]
-                weakness = sorted_cats[-1]
-            # ---------------------------------------------
+                strength, weakness = sorted_cats[0], sorted_cats[-1]
         else:
-            strength = ("N/A", 0)
-            weakness = ("N/A", 0)
+            strength, weakness = ("N/A", 0), ("N/A", 0)
 
         row_dict = dict(row)
         row_dict['stats'] = {
@@ -207,9 +228,25 @@ def admin():
         }
         processed_rows.append(row_dict)
 
-    return render_template('admin.html', responses=processed_rows, survey_data=SURVEY_DATA)
+    sorted_months = sorted(monthly_scores.keys())
+    trend_labels = []
+    trend_data = []
+    for m in sorted_months:
+        display_date = datetime.strptime(m, '%Y-%m').strftime('%b %Y')
+        trend_labels.append(display_date)
+        avg_score = sum(monthly_scores[m]) / len(monthly_scores[m])
+        trend_data.append(round(avg_score, 2))
 
+    return render_template('admin.html', 
+                         responses=processed_rows, 
+                         survey_data=SURVEY_DATA,
+                         trend_labels=trend_labels,
+                         trend_data=trend_data,
+                         start_date=start_date,
+                         end_date=end_date,
+                         unused_tokens=unused_tokens) # Passing tokens to template
 
+# ... [Keep report routes exactly as they were, they don't need token logic] ...
 
 # --- REPLACED REPORT ROUTE ---
 @app.route('/report')
@@ -217,10 +254,9 @@ def report():
     if request.args.get('key') != 'mysecretadminpassword':
         return "Access Denied."
 
-    # 1. Fetch ALL Data (Required for Trend Analysis)
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT * FROM survey_responses ORDER BY submitted_at ASC") # Ascending order is crucial for the Trend Chart
+    cur.execute("SELECT * FROM survey_responses ORDER BY submitted_at ASC") 
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -228,78 +264,52 @@ def report():
     if not rows:
         return "No data available to generate report."
 
-    # --- FILTER PARAMETERS ---
     selected_year = request.args.get('year')
     selected_month = request.args.get('month')
     
-    # 1. Extract unique YEARS from DB
     available_years = sorted(list(set([row['submitted_at'].strftime('%Y') for row in rows])), reverse=True)
-
-    # 2. Extract unique MONTHS from DB (Dynamic)
-    # This logic ensures we only show months that exist in the database
     present_month_nums = sorted(list(set([row['submitted_at'].strftime('%m') for row in rows])))
-    
-    # Create the map only for these existing months (e.g., {'01': 'January', '05': 'May'})
     month_map = {m: datetime.strptime(m, "%m").strftime("%B") for m in present_month_nums}
 
-    # --- ENGINE 1: TREND ANALYSIS (Uses ALL Data) ---
-    # Group data by YYYY-MM to calculate historical average scores
-    trend_buckets = {} # Format: {'2026-01': [score1, score2]}
-    
+    trend_buckets = {}
     for row in rows:
         month_key = row['submitted_at'].strftime('%Y-%m')
-        
-        # Calculate Individual Overall Score (Same logic as admin)
         answers = row['answers']
         cat_sums = {}
         cat_counts = {}
-        
         for key, val in answers.items():
             if isinstance(val, int) and '_' in key:
                 raw_cat = key.rsplit('_', 1)[0]
-                # Normalize Key
                 cat = raw_cat if raw_cat in SURVEY_DATA else raw_cat.replace(' and ', ' & ')
                 if cat not in SURVEY_DATA: continue
-                
                 cat_sums[cat] = cat_sums.get(cat, 0) + val
                 cat_counts[cat] = cat_counts.get(cat, 0) + 1
         
-        # Avg of Category Averages
         row_cat_avgs = []
         for cat in cat_sums:
             row_cat_avgs.append(cat_sums[cat] / cat_counts[cat])
-            
         if row_cat_avgs:
             row_overall = sum(row_cat_avgs) / len(row_cat_avgs)
             if month_key not in trend_buckets: trend_buckets[month_key] = []
             trend_buckets[month_key].append(row_overall)
 
-    # Prepare Chart Data
     trend_labels = []
     trend_data = []
     for m_key in sorted(trend_buckets.keys()):
         avg_score = sum(trend_buckets[m_key]) / len(trend_buckets[m_key])
-        # Convert '2026-01' -> 'Jan 2026' for display
         label = datetime.strptime(m_key, '%Y-%m').strftime('%b %Y')
         trend_labels.append(label)
         trend_data.append(round(avg_score, 2))
 
-
-    # --- ENGINE 2: SNAPSHOT ANALYSIS (Uses FILTERED Data) ---
-    # Filter rows based on selection
     filtered_rows = []
     for row in rows:
         row_year = row['submitted_at'].strftime('%Y')
         row_month = row['submitted_at'].strftime('%m')
-        
         if selected_year and row_year != selected_year: continue
         if selected_month and row_month != selected_month: continue
-        
         filtered_rows.append(row)
 
-    # Handle case where filter returns no results
     if not filtered_rows:
-        # Fallback to empty data structure to prevent page crash
         return render_template('report.html', 
                                averages={}, total=0, overall=0, strongest=("N/A",0), weakest=("N/A",0),
                                timestamp=get_ist_time().strftime('%Y-%m-%d %I:%M %p'),
@@ -307,16 +317,13 @@ def report():
                                selected_year=selected_year, selected_month=selected_month,
                                trend_labels=trend_labels, trend_data=trend_data)
 
-    # Standard Calculation on Filtered Subset
     category_scores = {category: [] for category in SURVEY_DATA.keys()}
-    
     for row in filtered_rows:
         answers = row['answers']
         for key, value in answers.items():
             if not isinstance(value, int): continue
             if '_' in key:
                 raw_cat = key.rsplit('_', 1)[0]
-                # Fix: Normalize 'and' to '&'
                 if raw_cat in category_scores:
                     category_scores[raw_cat].append(value)
                 elif raw_cat.replace(' and ', ' & ') in category_scores:
@@ -325,7 +332,6 @@ def report():
     final_averages = {}
     valid_categories_count = 0
     sum_of_category_averages = 0
-
     for cat, scores in category_scores.items():
         if scores:
             avg = sum(scores) / len(scores)
@@ -342,23 +348,17 @@ def report():
 
     active_cats = {k:v for k,v in final_averages.items() if v > 0}
     sorted_cats = sorted(active_cats.items(), key=lambda x: x[1], reverse=True)
-    
     strongest = sorted_cats[0] if sorted_cats else ("None", 0)
     weakest = sorted_cats[-1] if sorted_cats else ("None", 0)
-    
     ist_now = get_ist_time()
 
-    # --- ENGINE 3: WORD CLOUD PROCESSING ---
-    # 1. Collect all text comments from FILTERED rows
     text_corpus = ""
     for row in filtered_rows:
         answers = row['answers']
         for key, val in answers.items():
-            # Check for keys starting with "Comments" AND ensure value is a string
             if key.startswith('Comments') and isinstance(val, str):
                 text_corpus += " " + val.lower()
 
-    # 2. Simple Stop-Word Removal (Manual list to avoid heavy NLTK dependency)
     stop_words = set([
         'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 
         'he', 'him', 'his', 'she', 'her', 'hers', 'it', 'its', 'they', 'them', 'their', 
@@ -371,46 +371,35 @@ def report():
         'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 
         'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 
         'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now', 
-        'bstl', 'company', 'organization' # Context specific stop words
+        'bstl', 'company', 'organization'
     ])
     
-    # 3. Frequency Count
     import re
-    words = re.findall(r'\b[a-z]{3,}\b', text_corpus) # Only words 3+ chars
+    words = re.findall(r'\b[a-z]{3,}\b', text_corpus)
     word_counts = {}
     for word in words:
         if word not in stop_words:
             word_counts[word] = word_counts.get(word, 0) + 1
             
-    # Format for WordCloud2.js: [['word', count], ['word2', count]]
-    # Get Top 50 words
     sorted_words = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:50]
     word_cloud_data = [[word, count] for word, count in sorted_words]
 
-    # ... (Keep existing return statement but ADD word_cloud_data) ...
-
-
     return render_template('report.html', 
-                           # Snapshot Data
                            averages=final_averages, 
                            total=len(filtered_rows),
                            overall=overall_score,
                            strongest=strongest,
                            weakest=weakest,
                            timestamp=ist_now.strftime('%Y-%m-%d %I:%M %p'),
-                           # Filter Data
                            available_years=available_years,
                            month_map=month_map,
                            selected_year=selected_year,
                            selected_month=selected_month,
-                           # Trend Data
                            trend_labels=trend_labels,
                            trend_data=trend_data,
                            word_cloud_data=word_cloud_data)
 
 
-
-# --- NEW ROUTE: AGGREGATE ORGANIZATION ANALYSIS ---
 @app.route('/analyze_aggregate')
 def analyze_aggregate():
     conn = get_db_connection()
@@ -430,7 +419,6 @@ def analyze_aggregate():
             if not isinstance(value, int): continue
             if '_' in key:
                 raw_cat = key.rsplit('_', 1)[0]
-                # --- FIX: Normalize 'and' to '&' ---
                 if raw_cat in category_scores:
                     category_scores[raw_cat].append(value)
                 elif raw_cat.replace(' and ', ' & ') in category_scores:
@@ -445,11 +433,7 @@ def analyze_aggregate():
             final_averages[cat] = 0
 
     prompt_data = "\n".join([f"{cat}: {score}/5.0" for cat, score in final_averages.items()])
-    # --- Prompt Engineering ---
-    # Constructs a context-aware system prompt for the LLM.
-    # 1. Feeds raw quantitative data.
-    # 2. Instructs the model to act as an Organizational Psychologist.
-    # 3. Enforces a strict HTML output format for frontend rendering.
+
     system_prompt = f"""
     You are an expert Organizational Development Consultant and HR Strategist.
     You are analyzing the AGGREGATED survey results for the entire company.
@@ -488,9 +472,6 @@ def analyze_aggregate():
     """
 
     try:
-        # --- FIX: Use Valid Model Name ---
-        # Calls the Gemini API.
-        # Note: Ensure the model version (e.g., 'gemini-2.5-flash-lite') is currently supported.
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite', 
             contents=system_prompt
@@ -501,11 +482,8 @@ def analyze_aggregate():
         return jsonify({"error": str(e)}), 500
 
 
-
-# --- AI ANALYSIS ROUTE (With Caching) ---
 @app.route('/analyze_response/<int:response_id>')
 def analyze_response(response_id):
-    # 1. Fetch Data
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM survey_responses WHERE id = %s", (response_id,))
@@ -516,15 +494,10 @@ def analyze_response(response_id):
     if not row:
         return jsonify({"error": "Response not found"}), 404
 
-    # --- CACHE CHECK START ---
-    # Check if we already have an analysis saved in the database
-    # The .get() method handles cases where the column might be null
     if row.get('ai_analysis_text'):
         print(f"Serving cached analysis for Response ID {response_id}")
         return jsonify({"analysis": row['ai_analysis_text']})
-    # --- CACHE CHECK END ---
 
-    # 2. Construct the text prompt (If no cache found)
     answers = row['answers']
     prompt_data = ""
     
@@ -534,7 +507,6 @@ def analyze_response(response_id):
             raw_cat = parts[0]
             index = int(parts[1]) - 1 
 
-            # Normalize 'and' to '&' to match JSON keys
             if raw_cat in SURVEY_DATA:
                 category = raw_cat
             elif raw_cat.replace(' and ', ' & ') in SURVEY_DATA:
@@ -548,7 +520,6 @@ def analyze_response(response_id):
             except:
                 continue
 
-    # 3. System Prompt
     system_prompt = f"""
     You are an expert Organizational Psychologist and Senior HR Analyst.
     Analyze the following employee survey data.
@@ -581,18 +552,14 @@ def analyze_response(response_id):
     <ul><li>...</li></ul>
     """
 
-    # 4. Call Gemini & Save to Cache
     try:
         print(f"Calling Gemini API for Response ID {response_id}...")
-        
-        # using google-genai library syntax based on your requirements.txt
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite',
             contents=system_prompt
         )
         analysis_text = response.text
 
-        # --- SAVE TO DATABASE START ---
         try:
             conn = get_db_connection()
             cur = conn.cursor()
@@ -606,17 +573,12 @@ def analyze_response(response_id):
             print("Analysis saved to database.")
         except Exception as db_e:
             print(f"Warning: Failed to cache analysis: {db_e}")
-        # --- SAVE TO DATABASE END ---
 
         return jsonify({"analysis": analysis_text})
 
     except Exception as e:
         print(f"Gemini API Error: {e}")
         return jsonify({"error": str(e)}), 500
-    
 
-# --- Application Entry Point ---
-# Runs the server in debug mode for local development.
-# In production, this is handled by the WSGI server (Gunicorn).
 if __name__ == '__main__':
     app.run(debug=True)

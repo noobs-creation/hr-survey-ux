@@ -9,238 +9,218 @@
         :root { --primary: #FF6600; --bg: #f4f6f8; --success: #28a745; --danger: #dc3545; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); padding: 40px; color: #333; }
         
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        /* Page Title Section */
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 30px; /* Matches header.html margin */
+            padding: 0 10px; /* Visual alignment with card rounded corners */
+        }
         h1 { color: var(--primary); margin: 0; }
         .badge { background: var(--primary); color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9em; }
+
+        /* Analytics & Token Panels */
+        .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 40px; }
+        
+        .panel { 
+            background: white; 
+            /* CHANGED: Padding 40px to match Header.html alignment */
+            padding: 25px 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+        }
+
+        .token-list { height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border: 1px solid #eee; font-family: monospace; }
+        .token-item { padding: 4px 8px; border-bottom: 1px solid #eee; color: #333; display: flex; justify-content: space-between; }
+        .token-item:last-child { border-bottom: none; }
+        .copy-btn { cursor: pointer; color: var(--primary); font-size: 0.8em; }
 
         /* User Card */
         .user-card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; overflow: hidden; transition: transform 0.2s; }
         .user-card:hover { box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
-
-        .card-summary { padding: 20px 30px; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 50px; align-items: center; cursor: pointer; border-bottom: 1px solid transparent; }
-        .card-summary:hover { background-color: #fcfcfc; }
-        .card-summary.active { border-bottom: 1px solid #eee; background-color: #fafafa; }
-
-        .user-info h3 { margin: 0; font-size: 1.1em; color: var(--primary); }
-        .user-meta { font-size: 0.85em; color: #777; }
         
+        /* --- GRID ALIGNMENT ENGINE --- */
+        .card-summary { 
+            /* CHANGED: Padding 40px to match Header alignment */
+            padding: 20px 40px; 
+            display: grid; 
+            /* Fixed pixel widths ensure perfect vertical straight lines */
+            /* Name(Auto) | Score | Strength | Weakness | Arrow */
+            grid-template-columns: 1fr 120px 150px 150px 40px; 
+            gap: 20px;
+            align-items: center; 
+            cursor: pointer; 
+        }
+        
+        /* Name Truncation (Prevents layout break) */
+        .user-info { min-width: 0; } 
+        .user-info h3 { 
+            margin: 0; 
+            font-size: 1.1em; 
+            color: var(--primary); 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis;
+        }
+        
+        .user-meta { font-size: 0.85em; color: #777; display: block; margin-top: 4px; }
+        
+        /* Stats Styling */
         .stat-pill { text-align: center; }
-        .stat-label { font-size: 0.75em; text-transform: uppercase; color: #888; letter-spacing: 0.5px; display: block; }
+        .stat-label { font-size: 0.75em; text-transform: uppercase; color: #888; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
         .stat-value { font-weight: bold; font-size: 1.1em; }
         .score-high { color: var(--success); }
         .score-low { color: var(--danger); }
-
-        .card-details { display: none; padding: 30px; background: #fff; animation: fadeIn 0.3s ease-in-out; }
-        .card-details.show { display: block; }
-
-        .details-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 40px; }
         
-        /* Table */
+        .card-details { display: none; padding: 30px 40px; background: #fff; border-top: 1px solid #eee; }
+        .card-details.show { display: block; }
+        
+        /* Table & AI Styles */
         .data-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-        .data-table th { text-align: left; color: #555; padding: 8px; border-bottom: 2px solid #eee; }
+        .data-table th { text-align: left; padding: 8px; border-bottom: 2px solid #eee; }
         .data-table td { padding: 8px; border-bottom: 1px solid #f0f0f0; }
         .cat-tag { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; font-weight: bold; color: #555; }
 
-        .caret { transition: transform 0.3s; }
-        .active .caret { transform: rotate(180deg); }
-
-        /* AI Section Styles */
         .ai-section { margin-bottom: 30px; background: #f0f7ff; border: 1px solid #cce5ff; border-radius: 8px; padding: 20px; }
         .ai-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .btn-ai { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 8px; transition: opacity 0.2s; }
-        .btn-ai:hover { opacity: 0.9; }
-        
-        .ai-content { font-size: 0.95em; line-height: 1.6; color: #444; }
-        .ai-content h3 { margin-top: 15px; font-size: 1.1em; color: #333; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
-        .ai-content ul { padding-left: 20px; }
-        
-        /* Loading Spinner */
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #764ba2; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
+        .btn-ai { background: linear-gradient(135deg, #FF6600 0%, #ff8533 100%); color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .loader { display: none; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #FF6600; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
     <div class="container">
     {% include 'header.html' %} 
+
+    
+
+    <div class="dashboard-grid">
+        
+
+        <div class="panel">
+            <h4 style="margin: 0 0 10px 0; color: #333; display: flex; justify-content: space-between;">
+                <span>Unused Tokens ({{ unused_tokens|length }})</span>
+                <i class="ph ph-key" style="color: var(--primary);"></i>
+            </h4>
+            <div class="token-list">
+                {% for token in unused_tokens %}
+                <div class="token-item">
+                    <span>{{ token }}</span>
+                    <span class="copy-btn" onclick="navigator.clipboard.writeText('{{ token }}'); alert('Copied {{ token }}')">COPY</span>
+                </div>
+                {% endfor %}
+                {% if not unused_tokens %}
+                    <div style="padding: 20px; text-align: center; color: #999;">No unused tokens available.</div>
+                {% endif %}
+            </div>
+            <a href="/download_tokens?key=mysecretadminpassword" style="display:block; text-align:center; margin-top:10px; color:#FF6600; font-weight:bold; text-decoration:none; font-size: 0.9em;">
+                <i class="ph ph-file-csv"></i> Download CSV
+            </a>
+        </div>
+    </div>
+    <div><br></div>
     <div class="header">
         <div>
             <h1>Admin Dashboard</h1>
-            <p style="color: #666; margin-top: 5px;">Review individual employee feedback</p>
+            <p style="color: #666; margin-top: 5px;">Survey Overview & Token Management</p>
         </div>
         <span class="badge">{{ responses|length }} Submissions</span>
     </div>
-
     {% for row in responses %}
     <div class="user-card">
-        <div class="card-summary" onclick="toggleCard('details-{{ row.id }}', this)">
+        <div class="card-summary" onclick="document.getElementById('details-{{ row.id }}').classList.toggle('show')">
             <div class="user-info">
                 <h3>{{ row.respondent_name }}</h3>
-                <span class="user-meta">Submitted: {{ row.submitted_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                <span class="user-meta">{{ row.submitted_at.strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
             
             <div class="stat-pill">
-                <span class="stat-label">Overall</span>
-                <span class="stat-value">{{ row.stats.overall }} / 5</span>
+                <span class="stat-label">Score</span>
+                <span class="stat-value">{{ row.stats.overall }}</span>
             </div>
             <div class="stat-pill">
-                <span class="stat-label">Top Strength</span>
+                <span class="stat-label">Strength</span>
                 <span class="stat-value score-high">{{ row.stats.strength[0] }}</span>
             </div>
             <div class="stat-pill">
-                <span class="stat-label">Needs Focus</span>
+                <span class="stat-label">Weakness</span>
                 <span class="stat-value score-low">{{ row.stats.weakness[0] }}</span>
             </div>
-
-            <div style="text-align: right;">
-                <i class="ph ph-caret-down caret" style="font-size: 1.2em; color: #aaa;"></i>
-            </div>
-        </div>
-
-        <div id="details-{{ row.id }}" class="card-details">
             
+            <div style="text-align: right;"><i class="ph ph-caret-down"></i></div>
+        </div>
+        
+        <div id="details-{{ row.id }}" class="card-details">
             <div class="ai-section">
                 <div class="ai-header">
-                    <strong style="color: #FF6600; font-size: 1.1em;">🧠 AI Insight Report</strong>
-                    <button class="btn-ai" onclick="analyzeAI('{{ row.id }}')">
-                        <i class="ph ph-sparkle"></i> Generate Analysis
-                    </button>
+                    <strong>AI Insight</strong>
+                    <button class="btn-ai" onclick="analyzeAI('{{ row.id }}')">Analyze</button>
                 </div>
-                
-                <div id="loader-{{ row.id }}" style="display: none; align-items: center; gap: 10px; color: #666;">
-                    <div class="loader" style="display: block;"></div> 
-                    Consulting HR Expert AI...
-                </div>
-
-                <div id="ai-result-{{ row.id }}" class="ai-content"></div>
+                <div id="loader-{{ row.id }}" class="loader"></div>
+                <div id="ai-result-{{ row.id }}"></div>
             </div>
-
-            <div class="details-grid">
-                <div class="chart-container">
-                    <h4 style="text-align: center; color: #555; margin-bottom: 20px;">Competency Profile</h4>
-                    <canvas id="chart-{{ row.id }}"></canvas>
-                </div>
-
-                <div class="table-container">
-                    <h4 style="color: #555; margin-bottom: 20px;">Detailed Responses</h4>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Category / Question</th>
-                                <th>Rating</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for key, val in row.answers.items()|sort %}
-    {% if '_' in key %}
-        {% set parts = key.rsplit('_', 1) %}
-        {% set raw_cat = parts[0] %}
-        
-        {# --- FIX: Handle mismatch between 'and' (DB) and '&' (JSON) --- #}
-        {% if raw_cat in survey_data %}
-            {% set category = raw_cat %}
-        {% elif raw_cat.replace(' and ', ' & ') in survey_data %}
-            {% set category = raw_cat.replace(' and ', ' & ') %}
-        {% else %}
-            {% set category = raw_cat %}
-        {% endif %}
-
-        {% set index = parts[1]|int %} 
-        
-        {# --- SAFETY CHECK: Only try to show text if category exists --- #}
-        {% if category in survey_data %}
-            {% set question_text = survey_data[category][index - 1] %}
             
-            <tr>
-                <td>
-                    <span class="cat-tag">{{ category }}</span><br>
-                    <span style="color: #444;">{{ question_text }}</span>
-                </td>
-                <td>
-                    {% if val == 1 %}<strong style="color: #dc3545;">1</strong>
-                    {% elif val == 2 %}<span style="color: #e48632;">2</span>
-                    {% elif val == 4 %}<span style="color: #17a2b8;">4</span>
-                    {% elif val == 5 %}<strong style="color: #28a745;">5</strong>
-                    {% else %} 3 {% endif %}
-                </td>
-            </tr>
-        {% endif %}
-    {% endif %}
-{% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Question</th><th>Rating</th></tr>
+                </thead>
+                <tbody>
+                    {% for key, val in row.answers.items()|sort %}
+                        {% if '_' in key %}
+                            {% set parts = key.rsplit('_', 1) %}
+                            {% set raw_cat = parts[0] %}
+                            
+                            {% if raw_cat in survey_data %}
+                                {% set category = raw_cat %}
+                            {% elif raw_cat.replace(' and ', ' & ') in survey_data %}
+                                {% set category = raw_cat.replace(' and ', ' & ') %}
+                            {% else %}
+                                {% set category = raw_cat %}
+                            {% endif %}
+
+                            {% set index = parts[1]|int %} 
+                            
+                            {% if category in survey_data %}
+                                {% set question_text = survey_data[category][index - 1] %}
+                                <tr>
+                                    <td>
+                                        <span class="cat-tag">{{ category }}</span><br>
+                                        <span style="color: #444;">{{ question_text }}</span>
+                                    </td>
+                                    <td>
+                                        {% if val == 1 %}<strong style="color: #dc3545;">1</strong>
+                                        {% elif val == 2 %}<span style="color: #e48632;">2</span>
+                                        {% elif val == 4 %}<span style="color: #17a2b8;">4</span>
+                                        {% elif val == 5 %}<strong style="color: #28a745;">5</strong>
+                                        {% else %} 3 {% endif %}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
     {% endfor %}
-</div>
-    <script>
-        // 1. Accordion Toggle
-        function toggleCard(id, element) {
-            const details = document.getElementById(id);
-            details.classList.toggle('show');
-            element.classList.toggle('active');
-        }
+    </div>
 
-        // 2. AI Analysis Fetch Logic
+    <script>
         async function analyzeAI(responseId) {
             const resultBox = document.getElementById(`ai-result-${responseId}`);
             const loader = document.getElementById(`loader-${responseId}`);
-            
-            // Show loader, clear previous result
-            loader.style.display = 'flex';
+            loader.style.display = 'block';
             resultBox.innerHTML = '';
-            
             try {
                 const response = await fetch(`/analyze_response/${responseId}`);
                 const data = await response.json();
-                
-                if (data.analysis) {
-                    resultBox.innerHTML = data.analysis;
-                } else {
-                    resultBox.innerHTML = `<span style="color:red">Error: ${data.error}</span>`;
-                }
-            } catch (error) {
-                resultBox.innerHTML = `<span style="color:red">Connection Error. Please try again.</span>`;
-            } finally {
-                loader.style.display = 'none';
-            }
+                resultBox.innerHTML = data.analysis || data.error;
+            } catch (e) { resultBox.innerHTML = 'Error'; }
+            finally { loader.style.display = 'none'; }
         }
-
-        // 3. Initialize Charts
-        document.addEventListener("DOMContentLoaded", function() {
-            {% for row in responses %}
-                const ctx{{ row.id }} = document.getElementById('chart-{{ row.id }}').getContext('2d');
-                new Chart(ctx{{ row.id }}, {
-                    type: 'radar',
-                    data: {
-                        labels: {{ row.stats.categories_list | tojson }},
-                        datasets: [{
-                            label: 'Employee Score',
-                            data: {{ row.stats.scores_list | tojson }},
-                            backgroundColor: 'rgba(0, 51, 102, 0.2)',
-                            borderColor: 'rgba(0, 51, 102, 1)',
-                            borderWidth: 2,
-                            pointBackgroundColor: 'rgba(0, 51, 102, 1)'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        scales: {
-                            r: {
-                                min: 0, max: 5,
-                                ticks: { stepSize: 1, display: false },
-                                pointLabels: { font: { size: 11 } }
-                            }
-                        },
-                        plugins: { legend: { display: false } }
-                    }
-                });
-            {% endfor %}
-        });
     </script>
-    
 </body>
 </html>

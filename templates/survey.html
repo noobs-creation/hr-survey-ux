@@ -4,121 +4,137 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice of BSTL</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body { font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 900px; margin: 0 auto; background: white; border: 1px solid #ccc; padding: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding-top: 70px; /* Added padding for fixed bar */ color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border: 1px solid #ccc; padding: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 8px; }
         
         h1 { color: #FF6600; border-bottom: 3px solid #FF6600; padding-bottom: 10px; margin-top: 0; }
         
-        .instructions { background-color: #eef; padding: 15px; border: 1px solid #bnd; margin-bottom: 25px; font-size: 0.95em; line-height: 1.5; }
+        /* --- PROGRESS BAR STYLES --- */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
         
-        /* Category Header */
-        .category-header { background-color: #ddd; color: #FF6600; font-weight: bold; padding: 10px 15px; margin-top: 25px; border-left: 6px solid #FF6600; font-size: 1.1em; }
+        .progress-wrapper {
+            max-width: 900px;
+            width: 90%;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .bar-background {
+            flex-grow: 1;
+            height: 10px;
+            background-color: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #28a745, #34ce57);
+            border-radius: 10px;
+            transition: width 0.4s ease-in-out;
+        }
+
+        .progress-text {
+            font-weight: bold;
+            color: #FF6600;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+
+        /* --- EXISTING STYLES --- */
+        .instructions { background-color: #f0f7ff; padding: 15px; border-left: 5px solid #003366; margin-bottom: 25px; font-size: 0.95em; line-height: 1.5; border-radius: 4px; }
         
-        /* The Table Matrix */
+        .category-header { background-color: #f9f9f9; color: #FF6600; font-weight: bold; padding: 12px 15px; margin-top: 30px; border-left: 6px solid #FF6600; font-size: 1.1em; border-radius: 0 4px 4px 0; }
+        
         table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 0.9em; }
-        th { background-color: #FF6600; color: white; padding: 10px; text-align: center; font-weight: normal; }
+        th { background-color: #FF6600; color: white; padding: 12px; text-align: center; font-weight: 600; }
         th.question-col { text-align: left; width: 50%; }
         
-        td { border-bottom: 1px solid #ddd; padding: 10px; vertical-align: middle; }
-        
-        /* Zebra Striping */
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        tr:hover { background-color: #f1f1f1; }
+        td { border-bottom: 1px solid #eee; padding: 12px; vertical-align: middle; }
+        tr:nth-child(even) { background-color: #fdfdfd; }
+        tr:hover { background-color: #fff5f0; } /* Subtle orange hover */
         
         .radio-cell { text-align: center; }
-        input[type="radio"] { cursor: pointer; transform: scale(1.2); }
+        input[type="radio"] { cursor: pointer; width: 18px; height: 18px; accent-color: #FF6600; }
 
-        /* Submit Button */
         .btn-container { text-align: center; margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; }
-        button { background-color: #E65C00; color: white; padding: 12px 30px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 4px; }
-        button:hover { background-color: #E65C00; }
+        button { background-color: #E65C00; color: white; padding: 12px 40px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 30px; transition: background 0.3s, transform 0.2s; box-shadow: 0 4px 6px rgba(230, 92, 0, 0.3); }
+        button:hover { background-color: #cc5200; transform: translateY(-2px); }
 
-        /* Success Message */
-        .success-box { background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; padding: 20px; text-align: center; margin-bottom: 20px; font-size: 1.2em; }
+        .success-box { background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; padding: 20px; text-align: center; margin-bottom: 20px; font-size: 1.2em; border-radius: 8px; }
+        .error-box { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 15px; text-align: center; margin-bottom: 20px; border-radius: 4px; }
+        .token-input { font-size: 1.2em; padding: 8px; text-align: center; letter-spacing: 2px; text-transform: uppercase; border: 2px solid #FF6600; border-radius: 4px; width: 200px; }
     </style>
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body>
 
+    <div class="progress-container" id="progress-container" style="display:none;">
+        <div class="progress-wrapper">
+            <div style="font-weight: bold; color: #555; margin-right: 10px;">Progress:</div>
+            <div class="bar-background">
+                <div class="bar-fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-text" id="progress-text">0%</div>
+        </div>
+    </div>
+
 <div class="container">
     {% include 'header.html' %}  
+    
     {% if success %}
         <div class="success-box">
-            <strong>Thank You!</strong><br>
-            Your responses have been successfully saved to our database.
+            <i class="ph ph-check-circle" style="font-size: 2em; margin-bottom: 10px;"></i><br>
+            <strong>Survey Submitted Successfully!</strong><br>
+            Thank you for your valuable feedback.
         </div>
         <div style="text-align: center;">
-            <a href="/">Submit another response</a>
+            <a href="/" style="color: #FF6600; text-decoration: none; font-weight: bold;">Submit another response</a>
         </div>
     {% else %}
-        <h1>Voice of BSTL</h1>
-        <div class="instructions">
-            <div style="background: #f8f9fa; border-left: 5px solid #FF6600; padding: 25px; border-radius: 8px; margin-bottom: 30px;">
-        <h2 style="color: #003366; margin-top: 0;">Your Voice Matters</h2>
-        <p style="color: #555; line-height: 1.6;">
-            At <strong>BarodaSun Technologies Ltd</strong>, we are committed to building a workplace where every team member thrives. 
-            This survey is your opportunity to provide honest, confidential feedback on our culture, leadership, and your daily experience.
-        </p>
         
-        <div style="display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 200px; display: flex; align-items: start; gap: 10px;">
-                <span style="font-size: 1.5em;">🔒</span>
-                <div>
-                    <strong style="color: #333;">100% Confidential</strong>
-                    <div style="font-size: 0.9em; color: #666;">Your individual responses are anonymous. We look at aggregate data.</div>
-                </div>
-            </div>
+        <h1>Voice of BSTL</h1>
 
-            <div style="flex: 1; min-width: 200px; display: flex; align-items: start; gap: 10px;">
-                <span style="font-size: 1.5em;">📈</span>
-                <div>
-                    <strong style="color: #333;">Drive Change</strong>
-                    <div style="font-size: 0.9em; color: #666;">Leadership will use these insights to improve policies and work culture.</div>
-                </div>
-            </div>
-            
-            <div style="flex: 1; min-width: 200px; display: flex; align-items: start; gap: 10px;">
-                <span style="font-size: 1.5em;">⏱️</span>
-                <div>
-                    <strong style="color: #333;">Quick & Easy</strong>
-                    <div style="font-size: 0.9em; color: #666;">This survey takes approximately 10 minutes to complete.</div>
-                </div>
-            </div>
+        {% if error %}
+        <div class="error-box">
+            <strong>⚠️ Access Denied:</strong> {{ error }}
         </div>
-    </div>
+        {% endif %}
 
-    <div style="margin-bottom: 30px; padding: 15px; background: white; border: 1px solid #eee; border-radius: 8px; text-align: center;">
-        <p style="margin: 0 0 10px 0; font-weight: bold; color: #003366;">How to Read the Scale:</p>
-        <div style="display: flex; justify-content: space-between; max-width: 600px; margin: 0 auto; color: #555; font-size: 0.9em;">
-            <div style="text-align: center;">
-                <div style="font-size: 1.2em; font-weight: bold; color: #dc3545;">1</div>
-                <div>Strongly<br>Disagree</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 1.2em; font-weight: bold; color: #e48632;">2</div>
-                <div>Disagree</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 1.2em; font-weight: bold; color: #999;">3</div>
-                <div>Neutral</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 1.2em; font-weight: bold; color: #17a2b8;">4</div>
-                <div>Agree</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 1.2em; font-weight: bold; color: #28a745;">5</div>
-                <div>Strongly<br>Agree</div>
-            </div>
-        </div>
-    </div>
+        <div class="instructions">
+            <h2 style="color: #003366; margin-top: 0; font-size: 1.3em;">Your Voice Matters</h2>
+            <p style="margin-bottom: 0;">
+                At <strong>BarodaSun Technologies Ltd</strong>, we are committed to building a workplace where every team member thrives. 
+                Your responses are <strong>100% Confidential</strong> and decoupled from your identity.
+            </p>
         </div>
 
-        <form action="/submit" method="POST">
-            <div style="margin-bottom: 20px; padding: 10px; background: #fafafa; border: 1px solid #eee;">
+        <form action="/submit" method="POST" id="survey-form">
+            <div style="margin-bottom: 30px; padding: 20px; background: #fff8e1; border: 1px solid #ffe082; text-align: center; border-radius: 8px;">
+                <label style="font-weight: bold; display: block; margin-bottom: 10px; color: #333;">ENTER YOUR ACCESS TOKEN</label>
+                <input type="text" name="token" class="token-input" placeholder="ABCD1234" required maxlength="8">
+                <div style="font-size: 0.8em; color: #666; margin-top: 5px;">(Provided by your HR Administrator)</div>
+            </div>
+
+            <div style="margin-bottom: 20px; padding: 10px; background: #fafafa; border: 1px solid #eee; border-radius: 4px;">
                 <label style="font-weight: bold;">Your Name (Optional):</label>
-                <input type="text" name="respondent_name" style="padding: 5px; width: 250px;">
+                <input type="text" name="respondent_name" style="padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px;">
             </div>
 
             {% for category, questions in survey_data.items() %}
@@ -155,7 +171,7 @@
                                 
                                 {% for i in range(1, 6) %}
                                 <td class="radio-cell">
-                                    <input type="radio" name="{{ category }}_{{ q_index }}" value="{{ i }}" required>
+                                    <input type="radio" class="survey-radio" name="{{ category }}_{{ q_index }}" value="{{ i }}" required>
                                 </td>
                                 {% endfor %}
                             </tr>
@@ -171,16 +187,78 @@
         </form>
     {% endif %}
 </div>
-<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #777; font-size: 0.85em;">
-            <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 5px;">
-                <i class="ph ph-shield-check" style="font-size: 1.3em; color: #28a745;"></i>
-                <strong style="color: #333;">Cryptographically Anonymous</strong>
-            </div>
-            <p style="max-width: 600px; margin: 0 auto; line-height: 1.4;">
-                Your identity is protected. Survey responses are decoupled from user identifiers using a one-way hash algorithm before storage. 
-                Management cannot trace individual answers back to you.
-            </p>
-        </div>
+
+<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #777; font-size: 0.85em; padding-bottom: 40px;">
+    <!-- <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 5px;">
+        <i class="ph ph-shield-check" style="font-size: 1.3em; color: #28a745;"></i>
+        <strong style="color: #333;">Cryptographically Anonymous</strong>
+    </div> -->
+    <p style="max-width: 600px; margin: 0 auto; line-height: 1.4;">
+        Your identity is protected. Survey responses are decoupled from user identifiers.
+    </p>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const form = document.getElementById('survey-form');
+        
+        // Only run if the form exists (not on success page)
+        if (form) {
+            const progressBar = document.getElementById('progress-container');
+            const fill = document.getElementById('progress-fill');
+            const text = document.getElementById('progress-text');
+            
+            // Show the bar
+            progressBar.style.display = 'flex';
+
+            // 1. Identify all REQUIRED question groups
+            // We use a Set to store unique names of radio groups that have the 'required' attribute
+            const requiredGroups = new Set();
+            const allRadios = document.querySelectorAll('input[type="radio"][required]');
+            
+            allRadios.forEach(radio => {
+                requiredGroups.add(radio.name);
+            });
+
+            const totalQuestions = requiredGroups.size;
+            
+            function updateProgress() {
+                let answeredCount = 0;
+
+                // Check each required group to see if it has a value
+                requiredGroups.forEach(groupName => {
+                    const radios = document.querySelectorAll(`input[name="${groupName}"]`);
+                    for (const radio of radios) {
+                        if (radio.checked) {
+                            answeredCount++;
+                            break; // Stop checking this group once found
+                        }
+                    }
+                });
+
+                // Calculate Percentage
+                const percent = Math.round((answeredCount / totalQuestions) * 100);
+                
+                // Update UI
+                fill.style.width = percent + '%';
+                text.innerText = percent + '%';
+                
+                // Optional: Change color when complete
+                if (percent === 100) {
+                    fill.style.background = "#28a745"; // Solid green
+                }
+            }
+
+            // Attach event listeners to all radios
+            allRadios.forEach(radio => {
+                radio.addEventListener('change', updateProgress);
+            });
+
+            // Initial check (in case browser cached values on reload)
+            updateProgress();
+        }
+    });
+</script>
 
 </body>
 </html>
