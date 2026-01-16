@@ -13,7 +13,8 @@ import json
 import psycopg2
 import random
 import string
-from flask import Flask, render_template, request, jsonify, send_file, redirect
+# --- CHANGED: Added 'flash' to imports ---
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import pytz
@@ -36,6 +37,10 @@ client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 app = Flask(__name__)
 
+# --- CHANGED: Added Secret Key for Flash Messages ---
+# This is required for sessions/flash to work. 
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
+
 # Load questions
 with open('final_hr_questions.json', 'r') as f:
     SURVEY_DATA = json.load(f)
@@ -56,6 +61,8 @@ def get_ist_time():
 
 @app.route('/')
 def index():
+    # --- CHANGED: Removed request.args logic ---
+    # The template will now pull messages directly from the session via get_flashed_messages()
     return render_template('survey.html', survey_data=SURVEY_DATA)
 
 @app.route('/submit', methods=['POST'])
@@ -66,7 +73,9 @@ def submit():
     token_input = form_data.pop('token', '').strip().upper()
     
     if not token_input:
-        return render_template('survey.html', survey_data=SURVEY_DATA, error="Access Token is required.")
+        # --- CHANGED: Use flash instead of URL params ---
+        flash("Access Token is required.", "error")
+        return redirect(url_for('index'))
 
     # 2. Extract Data
     respondent_name = form_data.pop('respondent_name', 'Anonymous') or 'Anonymous'
@@ -91,14 +100,18 @@ def submit():
         if not token_row:
             cur.close()
             conn.close()
-            return render_template('survey.html', survey_data=SURVEY_DATA, error="Invalid Access Token.")
+            # --- CHANGED: Use flash ---
+            flash("Invalid Access Token.", "error")
+            return redirect(url_for('index'))
         
         token_id, is_used = token_row
         
         if is_used:
             cur.close()
             conn.close()
-            return render_template('survey.html', survey_data=SURVEY_DATA, error="This token has already been used.")
+            # --- CHANGED: Use flash ---
+            flash("This token has already been used.", "error")
+            return redirect(url_for('index'))
 
         # Mark token as used
         cur.execute("UPDATE survey_tokens SET is_used = TRUE, used_at = %s WHERE id = %s", (ist_now, token_id))
@@ -112,11 +125,15 @@ def submit():
         conn.commit()
         cur.close()
         conn.close()
-        return render_template('survey.html', survey_data=SURVEY_DATA, success=True)
+        
+        # --- CHANGED: Use flash for success ---
+        flash("success", "success_flag") # Using 'success_flag' category to identify state
+        return redirect(url_for('index'))
         
     except Exception as e:
         if conn: conn.rollback()
-        return f"Database Error: {e}"
+        flash(f"Database Error: {e}", "error")
+        return redirect(url_for('index'))
 
 
 @app.route('/admin')
@@ -248,8 +265,9 @@ def admin():
                          trend_data=trend_data,
                          start_date=start_date,
                          end_date=end_date,
-                         unused_tokens=unused_tokens) # Passing tokens to template
+                         unused_tokens=unused_tokens)
 
+# --- NEW ROUTE: GENERATE TOKENS ---
 @app.route('/generate_tokens')
 def generate_tokens():
     if request.args.get('key') != 'mysecretadminpassword':
@@ -491,6 +509,7 @@ def analyze_aggregate():
             if not isinstance(value, int): continue
             if '_' in key:
                 raw_cat = key.rsplit('_', 1)[0]
+                # --- FIX: Normalize 'and' to '&' ---
                 if raw_cat in category_scores:
                     category_scores[raw_cat].append(value)
                 elif raw_cat.replace(' and ', ' & ') in category_scores:

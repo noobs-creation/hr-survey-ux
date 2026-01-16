@@ -6,7 +6,8 @@
     <title>Voice of BSTL</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding-top: 70px; /* Added padding for fixed bar */ color: #333; }
+        /* Add padding-top so content isn't hidden behind the fixed progress bar */
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding-top: 80px; color: #333; }
         .container { max-width: 900px; margin: 0 auto; background: white; border: 1px solid #ccc; padding: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 8px; }
         
         h1 { color: #FF6600; border-bottom: 3px solid #FF6600; padding-bottom: 10px; margin-top: 0; }
@@ -58,7 +59,7 @@
             white-space: nowrap;
         }
 
-        /* --- EXISTING STYLES --- */
+        /* --- CONTENT STYLES --- */
         .instructions { background-color: #f0f7ff; padding: 15px; border-left: 5px solid #003366; margin-bottom: 25px; font-size: 0.95em; line-height: 1.5; border-radius: 4px; }
         
         .category-header { background-color: #f9f9f9; color: #FF6600; font-weight: bold; padding: 12px 15px; margin-top: 30px; border-left: 6px solid #FF6600; font-size: 1.1em; border-radius: 0 4px 4px 0; }
@@ -78,13 +79,26 @@
         button { background-color: #E65C00; color: white; padding: 12px 40px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 30px; transition: background 0.3s, transform 0.2s; box-shadow: 0 4px 6px rgba(230, 92, 0, 0.3); }
         button:hover { background-color: #cc5200; transform: translateY(-2px); }
 
+        /* Messages */
         .success-box { background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; padding: 20px; text-align: center; margin-bottom: 20px; font-size: 1.2em; border-radius: 8px; }
         .error-box { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 15px; text-align: center; margin-bottom: 20px; border-radius: 4px; }
+        
+        /* Token Input */
         .token-input { font-size: 1.2em; padding: 8px; text-align: center; letter-spacing: 2px; text-transform: uppercase; border: 2px solid #FF6600; border-radius: 4px; width: 200px; }
     </style>
 </head>
 <body>
 
+    {% set messages = get_flashed_messages(with_categories=true) %}
+    {% set ns = namespace(success_mode=false) %}
+    
+    {% for category, message in messages %}
+        {% if category == 'success_flag' %}
+            {% set ns.success_mode = true %}
+        {% endif %}
+    {% endfor %}
+
+    {% if not ns.success_mode %}
     <div class="progress-container" id="progress-container" style="display:none;">
         <div class="progress-wrapper">
             <div style="font-weight: bold; color: #555; margin-right: 10px;">Progress:</div>
@@ -94,28 +108,32 @@
             <div class="progress-text" id="progress-text">0%</div>
         </div>
     </div>
+    {% endif %}
 
 <div class="container">
     {% include 'header.html' %}  
     
-    {% if success %}
+    {% if ns.success_mode %}
         <div class="success-box">
             <i class="ph ph-check-circle" style="font-size: 2em; margin-bottom: 10px;"></i><br>
             <strong>Survey Submitted Successfully!</strong><br>
             Thank you for your valuable feedback.
         </div>
-        <div style="text-align: center;">
-            <a href="/" style="color: #FF6600; text-decoration: none; font-weight: bold;">Submit another response</a>
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="/" style="color: #FF6600; text-decoration: none; font-weight: bold;">Return to Home</a>
         </div>
+
     {% else %}
         
         <h1>Voice of BSTL</h1>
 
-        {% if error %}
-        <div class="error-box">
-            <strong>⚠️ Access Denied:</strong> {{ error }}
-        </div>
-        {% endif %}
+        {% for category, message in messages %}
+            {% if category == 'error' %}
+                <div class="error-box">
+                    <strong>⚠️ Access Denied:</strong> {{ message }}
+                </div>
+            {% endif %}
+        {% endfor %}
 
         <div class="instructions">
             <h2 style="color: #003366; margin-top: 0; font-size: 1.3em;">Your Voice Matters</h2>
@@ -189,8 +207,12 @@
 </div>
 
 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #777; font-size: 0.85em; padding-bottom: 40px;">
+    <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 5px;">
+        <i class="ph ph-shield-check" style="font-size: 1.3em; color: #28a745;"></i>
+        <strong style="color: #333;">Cryptographically Anonymous</strong>
+    </div>
     <p style="max-width: 600px; margin: 0 auto; line-height: 1.4;">
-        Your identity is protected. Survey responses are decoupled from user identifiers.
+        Your identity is protected. Survey responses are decoupled from user identifiers using a one-way hash algorithm before storage.
     </p>
 </div>
 
@@ -205,7 +227,7 @@
             const text = document.getElementById('progress-text');
             
             // Show the bar
-            progressBar.style.display = 'flex';
+            if(progressBar) progressBar.style.display = 'flex';
 
             // 1. Identify all REQUIRED question groups
             // We use a Set to store unique names of radio groups that have the 'required' attribute
@@ -227,21 +249,20 @@
                     for (const radio of radios) {
                         if (radio.checked) {
                             answeredCount++;
-                            break; // Stop checking this group once found
+                            break; 
                         }
                     }
                 });
 
                 // Calculate Percentage
-                const percent = Math.round((answeredCount / totalQuestions) * 100);
+                const percent = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
                 
                 // Update UI
-                fill.style.width = percent + '%';
-                text.innerText = percent + '%';
+                if(fill) fill.style.width = percent + '%';
+                if(text) text.innerText = percent + '%';
                 
-                // Optional: Change color when complete
-                if (percent === 100) {
-                    fill.style.background = "#28a745"; // Solid green
+                if (percent === 100 && fill) {
+                    fill.style.background = "#28a745"; 
                 }
             }
 
@@ -250,7 +271,7 @@
                 radio.addEventListener('change', updateProgress);
             });
 
-            // Initial check (in case browser cached values on reload)
+            // Initial check
             updateProgress();
         }
     });
